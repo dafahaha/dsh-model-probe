@@ -1,0 +1,234 @@
+/**
+ * The plugin's exact routes on the host's authenticated `/api` channel
+ * (`ctx.connection.fetch`, dsh 0.1.7+): GET prefilled endpoints, POST run a
+ * probe, GET append-only history. The host applies Host/Origin checks and
+ * browser authentication before a request reaches these handlers; this module
+ * additionally caps the POST body at 256KB (§3.3.2), validates a strict JSON
+ * shape with a field whitelist, and gates a custom executable path behind an
+ * explicit one-time confirmation (§3.6.2).
+ *
+ * NOTE (honest disclosure): real dsh-tui 0.16.x host live testing has NOT been
+ * done; loopback + Host + Origin/Sec-Fetch-Site enforcement is the host
+ * channel's responsibility, not this module's.
+ *
+ * @module dsh-model-probe/http-routes
+ */
+
+import { readFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { parseProfileProviders } from './endpoints.ts'
+import { appendEntry, hostOfUrl, makeId, readHistory } from './history.ts'
+import {
+  buildChildEnv,
+  buildVerifyArgs,
+  resolveCommand,
+  resolveKeyRouting,
+  withApiKeyEnv,
+} from './probe-args.ts'
+import { normalizeVerifyReport, parseVerifyReport, resolveFinalVerdict } from './report.ts'
+import { runVerify } from './probe-runner.ts'
+import { CustomCommandGate, isDefaultCommand } from './command-guard.ts'
+import { parseVerifyRequestBody, type VerifiedVerifyBody } from './verify-body.ts'
+import type { ConnectionRoute, LooseContext, ProbeConfig } from './types.ts'
+
+/** Where plugin-owned state lives under the harness home. */
+const STATE_DIR = 'model-probe'
+const HISTORY_FILE = 'history.jsonl'
+
+/** Route dependencies resolved by the node half at apply time. */
+export interface RouteDeps {
+  /** Harness-home joiner: `dshHomePath(...segments)`, when present. */
+  homePath: ((...segments: string[]) => string) | undefined
+  /** Resolve the profile patch file path to prefill from, when available. */
+  profilePatchPath: (() => string) | undefined
+  config: ProbeConfig
+  /** In-process gate remembering confirmed custom executable paths (§3.6.2). */
+  commandGate: CustomCommandGate
+}
+
+/** A JSON response helper. */
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+  })
+}
+
+/** Resolve the history file path, falling back to `~/.dsh/model-probe/`. */
+function historyFile(deps: RouteDeps): string {
+  if (typeof deps.homePath === 'function') {
+    const root = deps.homePath(STATE_DIR)
+    if (typeof root === 'string' && root.length > 0) return join(root, HISTORY_FILE)
+  }
+  return join(homedir(), '.dsh', STATE_DIR, HISTORY_FILE)
+}
+
+/** GET /api/model-probe/endpoints: best-effort prefill, host only. */
+async function handleEndpoints(deps: RouteDeps): Promise<Response> {
+  let endpoints: ReturnType<typeof parseProfileProviders> = []
+  if (typeof deps.profilePatchPath === 'function') {
+    try {
+      const text = await readFile(deps.profilePatchPath(), 'utf8')
+      endpoints = parseProfileProviders(text)
+    } catch {
+      endpoints = []
+    }
+  }
+  const command = resolveCommand(deps.config.command)
+  return json(200, {
+    endpoints,
+    defaults: {
+      command,
+      customCommand: !isDefaultCommand(deps.config.command),
+      maxRequests: deps.config.maxRequests,
+      totalTimeout: deps.config.totalTimeout,
+      allowLocal: deps.config.allowLocal,
+    },
+  })
+}
+
+/** POST /api/model-probe/verify: run the probe, store a history row, reply. */
+async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<Response> {
+  const { baseUrl, model } = body
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(baseUrl)
+  } catch {
+    return json(400, { error: 'invalid_url', message: 'baseUrl must be an http(s) URL' })
+  }
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+    return json(400, { error: 'invalid_url', message: 'baseUrl must be http(s)' })
+  }
+
+  // §3.6.2: a custom executable path is a code-execution surface; require an
+  // explicit one-time confirmation before the first spawn (remembered in-process).
+  const command = resolveCommand(deps.config.command)
+  const decision = deps.commandGate.check(command, body.confirmCustomCommand)
+  if (!decision.ok) {
+    return json(409, {
+      error: 'custom_command_unconfirmed',
+      message: '自定义可执行路径=代码执行面：请在确认其可信后勾选确认再运行。',
+    })
+  }
+
+  const allowLocal = body.allowLocal || deps.config.allowLocal
+
+  const routing = resolveKeyRouting(body.apiKey, body.apiKeyEnv)
+  const args = withApiKeyEnv(
+    buildVerifyArgs({
+      baseUrl,
+      model,
+      maxRequests: deps.config.maxRequests,
+      totalTimeout: deps.config.totalTimeout,
+      allowLocal,
+    }),
+    routing,
+  )
+  const env = buildChildEnv(process.env, routing)
+
+  const result = await runVerify({
+    command,
+    args,
+    env,
+    timeoutMs: (deps.config.totalTimeout + 20) * 1000,
+  })
+
+  let normalized
+  try {
+    normalized = normalizeVerifyReport(parseVerifyReport(result.stdout))
+  } catch {
+    // No usable report: fail closed as insufficient_evidence with an internal code.
+    normalized = normalizeVerifyReport({
+      claimed_model: model,
+      endpoint_base_url: hostOfUrl(baseUrl),
+      verdict: 'insufficient_evidence',
+      error: { code: 'no_report', message: 'CLI produced no usable JSON report.' },
+    })
+  }
+
+  const { verdict, errorCode } = resolveFinalVerdict(result.code, normalized)
+
+  await appendEntry(historyFile(deps), {
+    id: makeId(),
+    timestamp: normalized.timestamp,
+    host: normalized.endpointHost || hostOfUrl(baseUrl),
+    model,
+    verdict,
+    confidence: normalized.confidence,
+    posterior: normalized.summary.posterior,
+    tokenizerVerdict: normalized.summary.tokenizer?.verdict ?? null,
+    behavioralSamples: normalized.summary.behavioralSamples,
+    requestsUsed: normalized.summary.requestsUsed,
+    errorCode,
+  })
+
+  // A non-zero exit or an unusable report surfaces install guidance so the
+  // user is not left with a silent failure; a clean pass carries no hint.
+  const failed = result.code !== 0 || normalized.error !== null || result.timedOut
+  return json(200, {
+    report: normalized,
+    verdict,
+    errorCode,
+    timedOut: result.timedOut,
+    installHint: failed
+      ? '未检测到可用的 transit-truth CLI 或本次核验失败：内核尚未发布到 PyPI，请通过配置项 command 指向本地检出的 transit-truth，确认其在 PATH 后重试。'
+        + ' / No usable transit-truth CLI was found, or this verification failed: the kernel is not on PyPI yet; point the `command` setting at a local checkout of transit-truth, make sure it is on PATH, and retry.'
+      : null,
+  })
+}
+
+/** GET /api/model-probe/history: newest-first rows, host only. */
+async function handleHistory(deps: RouteDeps): Promise<Response> {
+  const rows = await readHistory(historyFile(deps))
+  return json(200, { history: [...rows].reverse() })
+}
+
+/**
+ * Register the three routes on the connection channel when the host provides
+ * it; a host without the channel simply has no routes and the page shows a
+ * setup note.
+ * @param ctx - registrant context.
+ * @param deps - resolved route dependencies.
+ */
+export function registerProbeRoutes(ctx: LooseContext, deps: RouteDeps): void {
+  ctx.inject(['connection'], (scope) => {
+    const channel = scope.get('connection') as { fetch?: { register: (route: ConnectionRoute) => () => unknown } } | undefined
+    const fetchApi = channel?.fetch
+    const register = fetchApi?.register
+    if (typeof register !== 'function' || fetchApi === undefined) return
+    const registered = register.bind(fetchApi) as (route: ConnectionRoute) => () => unknown
+    scope.effect(() => {
+      const disposers: Array<() => unknown> = []
+      const route = (r: Omit<ConnectionRoute, 'fetch'>, fetch: ConnectionRoute['fetch']) => {
+        disposers.push(registered({ ...r, fetch }))
+      }
+      route(
+        { path: '/api/model-probe/endpoints', methods: ['GET'], requestBody: 'buffered' },
+        () => handleEndpoints(deps),
+      )
+      route(
+        { path: '/api/model-probe/verify', methods: ['POST'], requestBody: 'buffered' },
+        async (request) => {
+          const contentType = (request.headers.get('content-type') ?? '').toLowerCase()
+          if (!contentType.startsWith('application/json')) {
+            return json(415, { error: 'unsupported-media-type' })
+          }
+          // Read the raw text so the measured byte count governs the 256KB cap
+          // (a lied-about Content-Length or chunked stream cannot bypass it).
+          const raw = await request.text()
+          const parsed = parseVerifyRequestBody(raw)
+          if (!parsed.ok) {
+            return json(parsed.status, { error: parsed.error, message: parsed.message })
+          }
+          return handleVerify(deps, parsed.body)
+        },
+      )
+      route(
+        { path: '/api/model-probe/history', methods: ['GET'], requestBody: 'buffered' },
+        () => handleHistory(deps),
+      )
+      return () => disposers.forEach(dispose => dispose())
+    }, 'dsh-model-probe: api routes')
+  })
+}

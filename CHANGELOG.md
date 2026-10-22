@@ -1,0 +1,55 @@
+# Changelog — dsh-model-probe
+
+Pre-release, reused from the earlier local draft (58 vitest tests green at v1).
+
+## v1 (baseline, carried over)
+- Thin bridge to local `transit-truth verify`; three-state badge; append-only
+  host-only JSONL history; key never in argv/disk/log; redaction layer; stubs
+  for pass/suspicious/error; 58 tests across 8 files green.
+
+## v2 (honesty metadata + false install hint)
+- README (EN/ZH) removed the false `pip install transit-truth` instruction: the
+  kernel is not on PyPI yet; prerequisites now state the local-checkout/`command`
+  path and the degrade-to-hint behavior. npm install marked pre-release only.
+- Runtime `installHint` string (http-routes) also carried the false pip command;
+  replaced with an honest "kernel not on PyPI; point `command` at local checkout"
+  message.
+- package.json 0.1.0 -> 0.1.1; description carries the pre-release note; added
+  `engines.node>=18` and placeholder repository/bugs fields for publish gates.
+
+## v3 (privacy fix: endpoint host-only in normalized report) — real bug
+- `normalizeVerifyReport` previously copied `endpoint_base_url` verbatim into the
+  normalized report; a URL carrying userinfo, path or `?key=` could reach the
+  report/history shape. Added `hostOnly()` (scheme-checked, host:port only,
+  lowercased, non-http/unparseable -> '') and unit tests for stripping and rejection.
+- `hostOfUrl` keeps a defensive `.toLowerCase()` (the URL API already lowercases;
+  this is belt-and-suspenders, not a behavior fix).
+
+## v4 (scope check)
+- Confirmed no network egress, no key read; no new runtime dependency; `files`
+  publish list unchanged.
+
+## v5 (spec compliance + mutation check)
+- NOTES.md records DSH Standard v2.0.0 checklist; pending items marked honestly.
+- Mutation self-check: bypassing `hostOnly` (return raw URL) turns the two new
+  report tests red; reverted, full suite green (61).
+
+## v6 (release-gate hardening, 2026-10-22)
+- P1-1: vendored the official `verify-plugin.mjs` static checker into `scripts/`
+  (provenance header; logic untouched); added `verify` and `pack` scripts; gate
+  exits 0 with 0 FAIL.
+- P2-1 (§3.6.4): `buildChildEnv` moved from wholesale `{...process.env}` to a
+  platform whitelist (Unix PATH/HOME/TMPDIR; Windows Path/SystemRoot/SystemDrive/
+  ComSpec/PATHEXT/USERPROFILE/TEMP/TMP/LOCALAPPDATA/APPDATA) plus the injected
+  probe key var; marker secrets no longer reach the child.
+- P2-2 (§3.6.2): custom `command` labeled "自定义可执行路径=代码执行面"; one-time
+  in-process confirmation gate before the first custom spawn (session memory only).
+- P2-3 (§3.3.2): POST body capped at 256KB (413) with strict JSON shape, field
+  whitelist and type validation (400); unknown fields rejected.
+- P3: emit `lib/client.d.ts` and wire `exports["./client"].types`; `engines.node
+  >=22`; `files` trimmed to `lib` + `cordis.patch.yml`; ref-based submit mutex;
+  in-process promise-chain lock on JSONL appends.
+- Honest disclosure (README zh/en): npm name taken by a deprecated third-party
+  package (not published to npm); kernel not on PyPI (companion only); real-host
+  live test pending. Placeholder `your-org` URLs replaced with the GitHub repo.
+- Tests: 61 -> 88 across 10 files, all green.

@@ -1,0 +1,79 @@
+{
+  "name": "dsh-model-probe",
+  "version": "0.1.1",
+  "description": "DSH plugin: one-click TransitTruth model-identity probe on the currently configured endpoint, with a three-state badge (pass / suspicious / insufficient_evidence) and an append-only local history. Thin shell over the local transit-truth CLI; it never stores or logs the API key. Pre-release: kernel not yet on PyPI; this package is NOT published to npm.",
+  "license": "MIT",
+  "author": "Daizhi Liao (dafahaha)",
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dafahaha/dsh-model-probe.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dafahaha/dsh-model-probe/issues"
+  },
+  "homepage": "https://github.com/dafahaha/dsh-model-probe#readme",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "transit-truth",
+    "model-identity",
+    "probe"
+  ],
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/client.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml"
+  ],
+  "scripts": {
+    "build": "tsdown && node scripts/fix-client-artifact.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.client.json",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "verify": "npm run build && node scripts/verify-plugin.mjs .",
+    "pack": "npm pack --dry-run"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "react"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "jsdom": "^25.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tsdown": "^0.22.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.1"
+  }
+}
