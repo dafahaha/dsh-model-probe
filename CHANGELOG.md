@@ -53,3 +53,21 @@ Pre-release, reused from the earlier local draft (58 vitest tests green at v1).
   package (not published to npm); kernel not on PyPI (companion only); real-host
   live test pending. Placeholder `your-org` URLs replaced with the GitHub repo.
 - Tests: 61 -> 88 across 10 files, all green.
+
+## v7 (manifest MUST fix + typecheck no-emit, 2026-10-22)
+- Standard §2.1.5 (MUST): `dsh.client.inject` must list the **packages** that
+  contribute the browser services, not Cordis service names/frameworks. It was
+  `["react"]`; the client source injects the `slots` service, which is provided
+  by `@deepseek-ai/dsh-client-ui-slots`. Corrected to that package and added it
+  to `peerDependencies` (React stays a shared peer runtime, not a client inject).
+- `files` now explicitly lists `README.md`, `README.en.md` and `LICENSE` (clears
+  the §2.1.9 SHOULD warning); npm packed file count is unchanged at 9.
+- Build hygiene: `tsconfig.json` had `declaration/emitDeclarationOnly/outDir` and
+  no `noEmit`, so `npm run typecheck` silently emitted per-module `.d.ts` files
+  into `lib/` (a stale build then packed 20 files instead of 9). Added
+  `noEmit: true` to the typecheck config and moved declaration emission to a
+  dedicated `tsconfig.dts.json`, wired into tsdown's node dts block (mirrors the
+  client's `tsconfig.client.dts.json`). Typecheck is now side-effect-free;
+  clean build is reproducible (4 lib files, pack 9 / 26.4 kB).
+- Gates after v7: verify 0 FAIL / 0 WARN / 0 INFO; tests 88/10 files; typecheck
+  and pack green.

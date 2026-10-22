@@ -29,7 +29,7 @@ export default [
     platform: 'node',
     target: 'es2024',
     fixedExtension: false,
-    dts: true,
+    dts: { tsconfig: './tsconfig.dts.json' },
     clean: true,
   },
   {
