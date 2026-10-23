@@ -1,5 +1,24 @@
 # Changelog — dsh-model-probe
 
+## v0.1.3 — Round-6 independent clean review (fresh reviewer, cold reading)
+- P1-1 (fixed): the SSRF guard now blocks `localhost` by name (and IPv6
+  equivalents). WHATWG URL already normalizes decimal/hex/octal/short IPv4
+  encodings (e.g. `2130706433`, `0x7f000001`, `127.1`) to dotted form before the
+  guard runs, so those are caught; a domain that resolves to a private address
+  still requires DNS and remains the CLI's responsibility (documented).
+- P2-1 (fixed): link-local coverage is now the full `fe80::/10` (fe80–febf),
+  the hex form of IPv4-mapped IPv6 (`::ffff:7f00:1`) is decoded, and an invalid
+  IP fails closed instead of being treated as public.
+- P2-2 (fixed): a spawn failure (ENOENT/EACCES) keeps its code as
+  `spawn_<code>` (e.g. `spawn_enoent`) so "command missing" is distinguishable
+  from "the CLI ran but produced no report"; fail-closed behavior is unchanged.
+- P2-3 (fixed): a baseUrl with embedded credentials (userinfo) is rejected with
+  400, so they cannot be passed as the `--base-url` argv value.
+- P2-5 (fixed): spawn is explicitly `shell: false`.
+- New tests: localhost/range/hex-mapped, route-level userinfo and localhost
+  rejection, spawn ENOENT. Suite: 95 -> 100 across 11 files. verify still
+  0 FAIL/WARN/INFO; pack still 9 files.
+
 ## v0.1.2 — Round-5 independent technical review (fresh reviewer, cold reading)
 - P2-1 (fixed): a `model`/`apiKeyEnv` value passed as a CLI option was not
   guarded against a leading `-`; model ids starting with `-` are rejected and

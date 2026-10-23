@@ -55,30 +55,60 @@ function json(status: number, body: unknown): Response {
   })
 }
 
+/** Loopback host names (not just literal IPs) blocked when allowLocal is false. */
+const LOCALHOST_NAMES = new Set(['localhost', 'ip6-localhost', 'ip6-loopback'])
+
 /**
  * Whether *hostname* is a non-public (loopback / private / link-local) literal
- * address. This is a defense-in-depth second check behind the CLI: it only
- * catches literal IPs, not hostnames that resolve to a private address.
- * @param hostname - the URL's hostname (brackets already stripped for IPv6).
+ * address or a loopback name. This is a defense-in-depth second check behind
+ * the CLI: it catches literal IPs and `localhost`, but NOT a domain name that
+ * resolves to a private address (no DNS is performed here; the CLI remains the
+ * primary guard for that case). WHATWG URL already normalizes decimal/hex/octal
+ * IPv4 encodings to dotted form before this runs.
+ * @param hostname - the URL's hostname (brackets tolerated for IPv6).
  * @returns true when the address is loopback, private, or link-local.
  */
 export function isNonPublicHost(hostname: string): boolean {
-  const h = hostname.toLowerCase()
-  // IPv4-mapped IPv6 (e.g. ::ffff:192.168.1.1) -> inspect the embedded v4.
-  const mapped = h.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
-  if (mapped) return isPrivateIPv4(mapped[1])
-  if (h === '::1' || h === '::') return true
-  if (h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return true
-  // Bare IPv6 loopback expansion 0:0:0:0:0:0:0:1.
-  if (/^(0:){7}1$/.test(h)) return true
+  let h = hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (LOCALHOST_NAMES.has(h)) return true
+
+  // IPv4-mapped IPv6, dotted form (::ffff:192.168.1.1) -> inspect embedded v4.
+  const mappedDotted = h.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
+  if (mappedDotted) return isPrivateIPv4(mappedDotted[1])
+  // IPv4-mapped IPv6, hex form (::ffff:7f00:1) -> decode the two hextets.
+  const mappedHex = h.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+  if (mappedHex) {
+    const hi = parseInt(mappedHex[1], 16), lo = parseInt(mappedHex[2], 16)
+    return isPrivateIPv4(`${(hi >> 8) & 255}.${hi & 255}.${(lo >> 8) & 255}.${lo & 255}`)
+  }
+
+  // Unspecified / loopback (compact and fully-expanded forms).
+  if (h === '::' || h === '::1' || /^(0:){7}1$/.test(h)) return true
+
+  // Range checks keyed on the first hextet.
+  const first = firstHextet(h)
+  if (first !== null) {
+    if (first >= 0xfc00 && first <= 0xfdff) return true // unique-local fc00::/7
+    if (first >= 0xfe80 && first <= 0xfebf) return true // link-local fe80::/10
+  }
+
+  // Direct dotted IPv4.
   if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return isPrivateIPv4(h)
   return false
 }
 
-/** Whether a dotted-quad IPv4 address is loopback, private, or link-local. */
+/** The numeric value of the first IPv6 hextet (0 for a leading `::`). */
+function firstHextet(h: string): number | null {
+  if (h.startsWith('::')) return 0
+  const m = h.match(/^([0-9a-f]{1,4})[:.]/)
+  return m ? parseInt(m[1], 16) : null
+}
+
+/** Whether a dotted-quad IPv4 address is loopback, private, or link-local. An
+ * invalid octet fails closed (blocked) rather than being treated as public. */
 function isPrivateIPv4(ip: string): boolean {
   const o = ip.split('.').map((x) => Number(x))
-  if (o.some((n) => n < 0 || n > 255)) return false
+  if (o.some((n) => n < 0 || n > 255)) return true
   const [a, b] = o
   if (a === 0 || a === 10 || a === 127) return true
   if (a === 100 && b >= 64 && b <= 127) return true // CGNAT 100.64.0.0/10
@@ -132,6 +162,14 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
   }
   if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
     return json(400, { error: 'invalid_url', message: 'baseUrl must be http(s)' })
+  }
+  // Reject embedded credentials: they would be passed as the --base-url argv
+  // value and could be visible in the local process list.
+  if (parsedUrl.username !== '' || parsedUrl.password !== '') {
+    return json(400, {
+      error: 'url_userinfo_blocked',
+      message: 'do not embed credentials in baseUrl; pass the key via the apiKey field',
+    })
   }
 
   const allowLocal = body.allowLocal || deps.config.allowLocal
@@ -189,7 +227,13 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
     })
   }
 
-  const { verdict, errorCode } = resolveFinalVerdict(result.code, normalized)
+  const resolved = resolveFinalVerdict(result.code, normalized)
+  // A spawn failure (ENOENT/EACCES) has no CLI report; surface its code so the
+  // operator can tell "command missing" from "the CLI ran but found nothing".
+  const effectiveErrorCode = result.spawnErrorCode
+    ? `spawn_${result.spawnErrorCode.toLowerCase()}`
+    : resolved.errorCode
+  const verdict = resolved.verdict
 
   await appendEntry(historyFile(deps), {
     id: makeId(),
@@ -202,7 +246,7 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
     tokenizerVerdict: normalized.summary.tokenizer?.verdict ?? null,
     behavioralSamples: normalized.summary.behavioralSamples,
     requestsUsed: normalized.summary.requestsUsed,
-    errorCode,
+    errorCode: effectiveErrorCode,
   })
 
   // A non-zero exit or an unusable report surfaces install guidance so the
@@ -211,7 +255,7 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
   return json(200, {
     report: normalized,
     verdict,
-    errorCode,
+    errorCode: effectiveErrorCode,
     timedOut: result.timedOut,
     installHint: failed
       ? '未检测到可用的 transit-truth CLI 或本次核验失败：内核尚未发布到 PyPI，请通过配置项 command 指向本地检出的 transit-truth，确认其在 PATH 后重试。'

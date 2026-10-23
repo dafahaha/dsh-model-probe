@@ -1,5 +1,41 @@
 import { describe, expect, it } from 'vitest'
-import { isNonPublicHost } from '../src/http-routes.ts'
+import { isNonPublicHost, registerProbeRoutes } from '../src/http-routes.ts'
+import { CustomCommandGate } from '../src/command-guard.ts'
+import type { ConnectionRoute } from '../src/types.ts'
+
+/** Build a mock host channel that captures every registered route. */
+function mockHost() {
+  const routes: ConnectionRoute[] = []
+  const connection = {
+    fetch: { register: (route: ConnectionRoute) => { routes.push(route); return () => {} } },
+  }
+  const ctx = {
+    inject: (_deps: unknown, cb: (scope: unknown) => unknown) => {
+      const scope = {
+        get: (name: string) => (name === 'connection' ? connection : undefined),
+        effect: (fn: () => unknown) => fn(),
+      }
+      cb(scope)
+    },
+  }
+  return { ctx, routes }
+}
+
+function deps() {
+  return {
+    homePath: undefined,
+    profilePatchPath: undefined,
+    config: { command: 'transit-truth', maxRequests: 10, totalTimeout: 10, allowLocal: false },
+    commandGate: new CustomCommandGate(),
+  }
+}
+
+/** Find the registered route for a given path and method. */
+function routeFor(routes: ConnectionRoute[], path: string, method: string) {
+  const r = routes.find((x) => x.path === path && x.methods.includes(method))
+  if (!r) throw new Error(`route not found: ${method} ${path}`)
+  return r
+}
 
 describe('isNonPublicHost (plugin-layer SSRF guard)', () => {
   it('flags loopback, private, and link-local IPv4', () => {
@@ -31,5 +67,49 @@ describe('isNonPublicHost (plugin-layer SSRF guard)', () => {
   it('inspects IPv4-mapped IPv6', () => {
     expect(isNonPublicHost('::ffff:192.168.1.1')).toBe(true)
     expect(isNonPublicHost('::ffff:8.8.8.8')).toBe(false)
+  })
+
+  it('flags localhost by name and the whole fe80::/10 link-local range', () => {
+    expect(isNonPublicHost('localhost')).toBe(true)
+    expect(isNonPublicHost('LocalHost')).toBe(true)
+    for (const h of ['fe80::1', 'fe90::1', 'fea0::1', 'febf::1']) {
+      expect(isNonPublicHost(h)).toBe(true)
+    }
+    // fec0:: is outside fe80::/10 (and outside fc00::/7) -> not flagged here.
+    expect(isNonPublicHost('fec0::1')).toBe(false)
+  })
+
+  it('decodes the hex form of IPv4-mapped IPv6 and tolerates brackets', () => {
+    expect(isNonPublicHost('::ffff:7f00:1')).toBe(true)
+    expect(isNonPublicHost('[::ffff:c0a8:0101]')).toBe(true)
+    expect(isNonPublicHost('::ffff:0808:0808')).toBe(false)
+  })
+})
+
+describe('POST /api/model-probe/verify input gates', () => {
+  async function postVerify(baseUrl: string) {
+    const host = mockHost()
+    registerProbeRoutes(host.ctx as never, deps() as never)
+    const route = routeFor(host.routes, '/api/model-probe/verify', 'POST')
+    const request = new Request('http://localhost/api/model-probe/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ baseUrl, model: 'gpt-4o-mini' }),
+    })
+    return route.fetch(request)
+  }
+
+  it('rejects a baseUrl with embedded userinfo (400) before spawning', async () => {
+    const res = await postVerify('http://user:secretpass@example.com/v1')
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('url_userinfo_blocked')
+  })
+
+  it('rejects localhost when allowLocal is false (400)', async () => {
+    const res = await postVerify('http://localhost:8080/v1')
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('local_address_blocked')
   })
 })

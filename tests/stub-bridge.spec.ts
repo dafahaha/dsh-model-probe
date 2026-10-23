@@ -74,6 +74,19 @@ describe('stub bridge: stdout redaction', () => {
   })
 })
 
+describe('stub bridge: spawn failure surfaces a code', () => {
+  it('reports a non-existent command as ENOENT and fails closed', async () => {
+    const result = await runVerify({
+      command: 'this-command-does-not-exist-zzz',
+      args: [],
+      env: {},
+      timeoutMs: 5000,
+    })
+    expect(result.code).toBeNull()
+    expect(result.spawnErrorCode).toBe('ENOENT')
+  })
+})
+
 describe('stub bridge: history append-only', () => {
   it('appends a row and reads it back without a key or full URL', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'stub-hist-'))

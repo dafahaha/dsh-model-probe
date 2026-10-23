@@ -19,6 +19,8 @@ export interface RunResult {
   stderr: string
   /** True when the wall-clock cap fired before exit. */
   timedOut: boolean
+  /** Node error code from a spawn failure (e.g. ENOENT/EACCES); null otherwise. */
+  spawnErrorCode: string | null
 }
 
 /** Spawn inputs shared by the runner. */
@@ -45,12 +47,15 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
       env: inputs.env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      // Explicit: never run through a shell, so argv cannot be reinterpreted.
+      shell: false,
     })
 
     let stdout = ''
     let stderr = ''
     let capped = false
     let settled = false
+    let spawnErrorCode: string | null = null
 
     const finish = (code: number | null, timedOut: boolean) => {
       if (settled) return
@@ -58,7 +63,7 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
       clearTimeout(timer)
       // Redact both streams before they leave the runner: a key-shaped string
       // the CLI ever printed into stdout must not reach the parser/response.
-      resolve({ code, stdout: redactText(stdout), stderr: redactText(stderr), timedOut })
+      resolve({ code, stdout: redactText(stdout), stderr: redactText(stderr), timedOut, spawnErrorCode })
     }
 
     const timer = setTimeout(() => {
@@ -80,10 +85,11 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
       if (stderr.length > 16 * 1024) stderr = stderr.slice(-16 * 1024)
     })
 
-    child.on('error', (error) => {
-      // ENOENT (command not found) surfaces as an error event, not an exit code.
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      // ENOENT (command not found) / EACCES surface as an error event. Keep the
+      // code for diagnostics (never the full argv/env); still fail closed.
+      spawnErrorCode = typeof error.code === 'string' ? error.code : 'spawn_failed'
       finish(null, false)
-      void error
     })
     child.on('close', (code) => finish(code, false))
   })
