@@ -12,6 +12,12 @@ describe('redactText', () => {
     expect(redactText('Authorization: Bearer abc.def.ghi')).toContain('Bearer <redacted>')
   })
 
+  it('redacts a Basic auth credential (base64 user:password)', () => {
+    const out = redactText('Authorization: Basic dXNlcjpwYXNzd29yZA==')
+    expect(out).not.toContain('dXNlcjpwYXNzd29yZA==')
+    expect(out).toContain('Basic <redacted>')
+  })
+
   it('redacts api_key= and token= assignments', () => {
     expect(redactText('api_key=sk-secret123')).toContain('<redacted>')
     expect(redactText('token: abc123token')).toContain('<redacted>')

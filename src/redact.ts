@@ -24,6 +24,9 @@ const HIGH_ENTROPY = /\b(?=[A-Za-z0-9_\-]{24,})(?=[A-Za-z0-9_\-]*[a-z])(?=[A-Za-
 /** `Authorization: Bearer <token>` headers. */
 const BEARER = /(Bearer\s+)[A-Za-z0-9._\-]+/gi
 
+/** `Authorization: Basic <base64>` headers (the base64 encodes user:password). */
+const BASIC = /(Basic\s+)[A-Za-z0-9._\-+/=]+/gi
+
 /** `api_key=…`, `apiKey: …`, `token=…`, `secret: …` style assignments. */
 const ASSIGNMENT = /((?:api[_-]?key|apikey|access[_-]?token|token|secret|password)\s*[=:]\s*)["']?[^\s"',&]+/gi
 
@@ -56,6 +59,7 @@ export function redactText(text: string | undefined | null): string {
     .replace(AWS_KEY, '<redacted>')
     .replace(HIGH_ENTROPY, '<redacted>')
     .replace(BEARER, '$1<redacted>')
+    .replace(BASIC, '$1<redacted>')
     .replace(ASSIGNMENT, '$1<redacted>')
     .replace(URL_CREDENTIALS, '$1<redacted>:<redacted>@')
 }

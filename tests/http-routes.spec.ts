@@ -58,6 +58,14 @@ describe('isNonPublicHost (plugin-layer SSRF guard)', () => {
     for (const h of publicHosts) expect(isNonPublicHost(h)).toBe(false)
   })
 
+  it('flags multicast, reserved, and benchmarking ranges', () => {
+    for (const h of ['224.0.0.1', '239.255.255.1', '240.0.0.1', '255.255.255.255', '198.18.0.1', '198.19.255.255']) {
+      expect(isNonPublicHost(h)).toBe(true)
+    }
+    // 198.20 is outside the 198.18.0.0/15 benchmarking range -> public.
+    expect(isNonPublicHost('198.20.0.1')).toBe(false)
+  })
+
   it('does not mistake a DNS name beginning like an IPv6 hextet for a non-public host', () => {
     for (const h of ['fc00.example.com', 'fd01.foo.com', 'fe80.bar.com', 'febf.qux.net']) {
       expect(isNonPublicHost(h)).toBe(false)

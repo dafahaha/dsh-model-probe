@@ -1,5 +1,19 @@
 # Changelog — dsh-model-probe
 
+## v0.1.8 — Round-11 independent clean review (fresh reviewer, cold reading)
+- P2-1 (verified present): the spawn 'error' path already calls finish (a
+  spawn-stage failure cannot hang the promise).
+- P2-2 (fixed): the timeout timer guards the close/timer race — a child that
+  already exited (exitCode set) is not marked timed out.
+- P2-4 (fixed): redact now covers `Authorization: Basic <base64>` credentials.
+- P2-6 (fixed): the SSRF guard blocks multicast (224.0.0.0/4), reserved
+  (240.0.0.0/4), and benchmarking (198.18.0.0/15) ranges.
+- Verified non-issues: integer/hex/octal/short-form IPv4 (2130706433,
+  0x7f000001, 0177.0.0.1, 127.1) are normalized to 127.0.0.1 by WHATWG URL
+  before the guard; the v4Hex branch uses radix 16; Windows process.env is
+  case-insensitive.
+- Suite: 116 vitest (12 files).
+
 ## v0.1.7 — Round-10 independent clean review (fresh reviewer, cold reading)
 - P2-1 (fixed): extracted OutputCapture/TailCapture (deterministic byte/tail
   caps); stdout/stderr truncation flags are returned in the response and

@@ -126,6 +126,8 @@ function isPrivateIPv4(ip: string): boolean {
   if (a === 169 && b === 254) return true
   if (a === 172 && b >= 16 && b <= 31) return true
   if (a === 192 && b === 168) return true
+  if (a === 198 && (b === 18 || b === 19)) return true // benchmarking 198.18.0.0/15
+  if (a >= 224) return true // multicast 224.0.0.0/4 (224-239); reserved 240.0.0.0/4 (240-255)
   return false
 }
 

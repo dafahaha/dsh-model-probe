@@ -128,6 +128,12 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
     }
 
     const timer = setTimeout(() => {
+      // Close/timer race: if the child already exited (exitCode set) but the
+      // close event is still queued, do not mark it as timed out.
+      if (child.exitCode !== null || child.signalCode !== null) {
+        finish(child.exitCode, false)
+        return
+      }
       child.kill('SIGKILL')
       finish(null, true)
     }, inputs.timeoutMs)
