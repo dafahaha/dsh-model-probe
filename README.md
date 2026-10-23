@@ -27,6 +27,12 @@
 - **内核未上 PyPI，本插件是配套 companion**：核验能力全部来自本地 `transit-truth` 内核 CLI；内核尚未发布到 PyPI，本插件不能独立提供核验能力，必须配合本地检出的内核源码使用。
 - **真实宿主 live 测试待做**：尚未在真实 dsh-tui 0.16.x 宿主界面做过端到端 live 测试；Host/Origin/loopback 强制由宿主通道负责，本插件不自行实现。
 
+## 安全边界（诚实声明）
+
+- **SSRF 守卫是字面量主机检查，不是 DNS 解析防护**：`isNonPublicHost` 拦截环回/私有/link-local 的 IP 字面量与 `localhost` 名称（含尾点、`.localhost`、IPv4-mapped），但不解析 DNS。一个公网域名若解析到内网地址（或 DNS 重绑定）不在本插件防护范围内；威胁模型是宿主已认证的本地单用户工具。
+- **响应只回传结构化解析报告，不回显原始 stdout**：即便 CLI 输出了非标准前缀的密钥形态，也不会经自由文本回传到客户端；`redactText` 是额外的纵深防御。
+- **超时 SIGKILL 是兜底，针对直接子进程**：子进程同时收到 `--total-timeout` 约束其自身工作；Windows 下不做进程树/Job Object 回收。
+
 ## 安装
 
 仅支持本地从源码安装（配套本地内核检出）。在本仓库目录执行：

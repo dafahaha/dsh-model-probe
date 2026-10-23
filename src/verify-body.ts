@@ -86,6 +86,9 @@ export function parseVerifyRequestBody(rawText: string): VerifyBodyResult {
   if (typeof record.baseUrl !== 'string' || record.baseUrl.trim().length === 0) {
     return reject(400, 'missing_field', 'baseUrl is required and must be a non-empty string')
   }
+  if (record.baseUrl.trim().startsWith('-')) {
+    return reject(400, 'invalid_value', 'baseUrl must not start with "-"')
+  }
   if (typeof record.model !== 'string' || record.model.trim().length === 0) {
     return reject(400, 'missing_field', 'model is required and must be a non-empty string')
   }

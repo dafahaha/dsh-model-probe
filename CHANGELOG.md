@@ -1,5 +1,17 @@
 # Changelog — dsh-model-probe
 
+## v0.1.5 — Round-8 independent clean review (fresh reviewer, cold reading)
+- P2-2 (fixed): a `baseUrl` starting with "-" is now rejected, matching the
+  `model` rule (CLI flag injection consistency).
+- Stated boundaries (documented, not code changes): the SSRF guard is a
+  literal host check, not a DNS-resolution defense (a public domain that
+  resolves to a private address is out of scope; the child also receives
+  `--total-timeout` to bound its own work); the response returns only the
+  structured parsed report, not raw free-text stdout, so custom-prefix
+  secret forms in CLI output are not echoed; the timeout SIGKILL backstop
+  targets the direct child process.
+- Suite: 103 vitest (1 added); verify 0 FAIL/WARN/INFO; pack 9 files.
+
 ## v0.1.4 — Round-7 independent clean review (fresh reviewer, cold reading)
 - P2-1 (fixed): the SSRF guard now normalizes a trailing dot (`localhost.`) and
   blocks a `.localhost` suffix name.

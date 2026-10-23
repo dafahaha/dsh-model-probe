@@ -114,6 +114,12 @@ describe('parseVerifyRequestBody: field whitelist + types', () => {
     if (!result.ok) expect(result.error).toBe('invalid_value')
   })
 
+  it('rejects a baseUrl starting with "-" (CLI flag injection)', () => {
+    const result = parseVerifyRequestBody(JSON.stringify({ ...VALID, baseUrl: '--evil' }))
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toBe('invalid_value')
+  })
+
   it('rejects an apiKeyEnv that is not a valid identifier', () => {
     for (const bad of ['--foo', 'A=B', 'has space', '1STARTSDIGIT']) {
       const result = parseVerifyRequestBody(JSON.stringify({ ...VALID, apiKeyEnv: bad }))
