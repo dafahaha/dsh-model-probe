@@ -84,6 +84,12 @@ describe('isNonPublicHost (plugin-layer SSRF guard)', () => {
     expect(isNonPublicHost('[::ffff:c0a8:0101]')).toBe(true)
     expect(isNonPublicHost('::ffff:0808:0808')).toBe(false)
   })
+
+  it('flags trailing-dot and .localhost suffix names', () => {
+    expect(isNonPublicHost('localhost.')).toBe(true)
+    expect(isNonPublicHost('LocalHost.')).toBe(true)
+    expect(isNonPublicHost('api.localhost')).toBe(true)
+  })
 })
 
 describe('POST /api/model-probe/verify input gates', () => {
@@ -111,5 +117,24 @@ describe('POST /api/model-probe/verify input gates', () => {
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toBe('local_address_blocked')
+  })
+
+  it('rejects an apiKeyEnv that is not set in the environment (400)', async () => {
+    const host = mockHost()
+    registerProbeRoutes(host.ctx as never, deps() as never)
+    const route = routeFor(host.routes, '/api/model-probe/verify', 'POST')
+    const request = new Request('http://localhost/api/model-probe/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        baseUrl: 'http://example.com/v1',
+        model: 'gpt-4o-mini',
+        apiKeyEnv: 'DSH_PROBE_VAR_DEFINITELY_UNSET_12345',
+      }),
+    })
+    const res = await route.fetch(request)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('api_key_env_unset')
   })
 })

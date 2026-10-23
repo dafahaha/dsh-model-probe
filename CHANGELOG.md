@@ -1,5 +1,12 @@
 # Changelog — dsh-model-probe
 
+## v0.1.4 — Round-7 independent clean review (fresh reviewer, cold reading)
+- P2-1 (fixed): the SSRF guard now normalizes a trailing dot (`localhost.`) and
+  blocks a `.localhost` suffix name.
+- P2-2 (fixed): a named `apiKeyEnv` that is not set in the environment now
+  returns a 400 fail-closed instead of leaving the child with no key.
+- Suite: 102 vitest (2 added); verify 0 FAIL/WARN/INFO; pack 9 files.
+
 ## v0.1.3 — Round-6 independent clean review (fresh reviewer, cold reading)
 - P1-1 (fixed): the SSRF guard now blocks `localhost` by name (and IPv6
   equivalents). WHATWG URL already normalizes decimal/hex/octal/short IPv4

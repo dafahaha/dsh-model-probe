@@ -70,7 +70,10 @@ const LOCALHOST_NAMES = new Set(['localhost', 'ip6-localhost', 'ip6-loopback'])
  */
 export function isNonPublicHost(hostname: string): boolean {
   let h = hostname.toLowerCase().replace(/^\[|\]$/g, '')
-  if (LOCALHOST_NAMES.has(h)) return true
+  // Normalize a trailing dot ("localhost.") and a ".localhost" suffix, both of
+  // which resolvers typically treat as the loopback host.
+  h = h.replace(/\.$/, '')
+  if (LOCALHOST_NAMES.has(h) || h.endsWith('.localhost')) return true
 
   // IPv4-mapped IPv6, dotted form (::ffff:192.168.1.1) -> inspect embedded v4.
   const mappedDotted = h.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
@@ -195,6 +198,17 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
   }
 
   const routing = resolveKeyRouting(body.apiKey, body.apiKeyEnv)
+  // Fail closed: a named existing env var that is not actually set would leave
+  // the child with no key and blur the failure into a vague model/report error.
+  if (
+    routing.passThroughEnv !== undefined
+    && process.env[routing.passThroughEnv] === undefined
+  ) {
+    return json(400, {
+      error: 'api_key_env_unset',
+      message: `apiKeyEnv ${routing.passThroughEnv} is not set in this environment; set it or paste the key`,
+    })
+  }
   const args = withApiKeyEnv(
     buildVerifyArgs({
       baseUrl,
