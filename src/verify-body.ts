@@ -108,6 +108,18 @@ export function parseVerifyRequestBody(rawText: string): VerifyBodyResult {
     // restrict it to a normal identifier (no spaces, '=', or leading '-').
     return reject(400, 'invalid_value', 'apiKeyEnv must be a valid environment variable name')
   }
+  if (
+    typeof record.apiKey === 'string' && record.apiKey.trim() !== ''
+    && typeof record.apiKeyEnv === 'string' && record.apiKeyEnv.trim() !== ''
+  ) {
+    // Both key routes are ambiguous: the runner would silently use the inline
+    // key and ignore the named variable. Reject rather than guess.
+    return reject(
+      400,
+      'conflicting_key_fields',
+      'provide either apiKey (inline) or apiKeyEnv (a named environment variable), not both',
+    )
+  }
   if (record.allowLocal !== undefined && typeof record.allowLocal !== 'boolean') {
     return reject(400, 'invalid_type', 'allowLocal must be a boolean')
   }

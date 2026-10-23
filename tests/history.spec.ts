@@ -79,6 +79,22 @@ describe('append-only history', () => {
     expect(await readHistory(join(tmpdir(), 'nope.jsonl'))).toEqual([])
   })
 
+  it('rejects an unwritable path but keeps the chain alive for later appends', async () => {
+    // A path whose parent is an existing regular file cannot be created; the
+    // append rejects, yet the in-process chain must not wedge (the route then
+    // catches the rejection and still returns the verdict).
+    const dir = mkdtempSync(join(tmpdir(), 'hist-fail-'))
+    const blocker = join(dir, 'a-file')
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(blocker, 'x', 'utf8')
+    const badPath = join(blocker, 'history.jsonl')
+    await expect(appendEntry(badPath, entry())).rejects.toBeTruthy()
+    // A later append to a valid path still succeeds.
+    const good = join(dir, 'history.jsonl')
+    await appendEntry(good, entry())
+    expect(await readHistory(good)).toHaveLength(1)
+  })
+
   it('never stores a key or full URL in a row', () => {
     const row = entry()
     const serialized = JSON.stringify(row)

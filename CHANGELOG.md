@@ -1,5 +1,20 @@
 # Changelog — dsh-model-probe
 
+## v0.1.9 — Round-12 independent clean review (fresh reviewer, cold reading)
+- P2 (fixed): a history persistence failure (disk full, permission, Windows
+  lock) no longer discards the verdict the CLI just produced — the append is a
+  side-channel audit and is best-effort. (Reads already skipped corrupt lines.)
+- P2 (fixed): the install hint distinguishes a missing CLI (spawn
+  ENOENT/EACCES) from a CLI that ran but did not pass (model mismatch / report
+  error / timeout), so it no longer claims the CLI is missing when it is not.
+- P2 (fixed): supplying both apiKey and apiKeyEnv now returns 400
+  `conflicting_key_fields` instead of silently ignoring the named variable.
+- P2 (fixed, pre-existing): strict typecheck failures in the SSRF helpers
+  (possibly-undefined capture groups / octets) are resolved; `isPrivateIPv4`
+  also rejects non-finite and non-4-part input.
+- Suite: 119 vitest (12 files); typecheck, verify (0 FAIL/WARN/INFO) and pack
+  (9 files) all pass.
+
 ## v0.1.8 — Round-11 independent clean review (fresh reviewer, cold reading)
 - P2-1 (verified present): the spawn 'error' path already calls finish (a
   spawn-stage failure cannot hang the promise).

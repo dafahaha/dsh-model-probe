@@ -80,11 +80,11 @@ export function isNonPublicHost(hostname: string): boolean {
   // (::ffff:192.168.1.1) and the deprecated compatible form
   // (::192.168.1.1) -> inspect the embedded v4.
   const v4Dotted = h.match(/^::(?:ffff:)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
-  if (v4Dotted) return isPrivateIPv4(v4Dotted[1])
+  if (v4Dotted && v4Dotted[1] !== undefined) return isPrivateIPv4(v4Dotted[1])
   // Embedded-IPv4 transition forms, two-hextet hex (::ffff:7f00:1 and the
   // compatible ::7f00:1) -> decode the two hextets.
   const v4Hex = h.match(/^::(?:ffff:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
-  if (v4Hex) {
+  if (v4Hex && v4Hex[1] !== undefined && v4Hex[2] !== undefined) {
     const hi = parseInt(v4Hex[1], 16), lo = parseInt(v4Hex[2], 16)
     return isPrivateIPv4(`${(hi >> 8) & 255}.${hi & 255}.${(lo >> 8) & 255}.${lo & 255}`)
   }
@@ -112,15 +112,16 @@ export function isNonPublicHost(hostname: string): boolean {
 function firstHextet(h: string): number | null {
   if (h.startsWith('::')) return 0
   const m = h.match(/^([0-9a-f]{1,4}):/)
-  return m ? parseInt(m[1], 16) : null
+  return m && m[1] !== undefined ? parseInt(m[1], 16) : null
 }
 
 /** Whether a dotted-quad IPv4 address is loopback, private, or link-local. An
  * invalid octet fails closed (blocked) rather than being treated as public. */
 function isPrivateIPv4(ip: string): boolean {
   const o = ip.split('.').map((x) => Number(x))
-  if (o.some((n) => n < 0 || n > 255)) return true
+  if (o.length !== 4 || o.some((n) => !Number.isFinite(n) || n < 0 || n > 255)) return true
   const [a, b] = o
+  if (a === undefined || b === undefined) return true
   if (a === 0 || a === 10 || a === 127) return true
   if (a === 100 && b >= 64 && b <= 127) return true // CGNAT 100.64.0.0/10
   if (a === 169 && b === 254) return true
@@ -266,24 +267,43 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
   }
   const verdict = resolved.verdict
 
-  await appendEntry(historyFile(deps), {
-    id: makeId(),
-    timestamp: normalized.timestamp,
-    host: normalized.endpointHost || hostOfUrl(baseUrl),
-    model,
-    verdict,
-    confidence: normalized.confidence,
-    posterior: normalized.summary.posterior,
-    tokenizerVerdict: normalized.summary.tokenizer?.verdict ?? null,
-    behavioralSamples: normalized.summary.behavioralSamples,
-    requestsUsed: normalized.summary.requestsUsed,
-    errorCode: effectiveErrorCode,
-    outputTruncated,
-  })
+  // History is a side-channel audit; a persistence failure (disk full,
+  // permission, Windows file lock) must not discard the verdict the CLI just
+  // produced — return it anyway.
+  try {
+    await appendEntry(historyFile(deps), {
+      id: makeId(),
+      timestamp: normalized.timestamp,
+      host: normalized.endpointHost || hostOfUrl(baseUrl),
+      model,
+      verdict,
+      confidence: normalized.confidence,
+      posterior: normalized.summary.posterior,
+      tokenizerVerdict: normalized.summary.tokenizer?.verdict ?? null,
+      behavioralSamples: normalized.summary.behavioralSamples,
+      requestsUsed: normalized.summary.requestsUsed,
+      errorCode: effectiveErrorCode,
+      outputTruncated,
+    })
+  } catch {
+    // best-effort persistence; the result below is still returned
+  }
 
-  // A non-zero exit or an unusable report surfaces install guidance so the
-  // user is not left with a silent failure; a clean pass carries no hint.
+  // Distinguish a missing CLI (spawn ENOENT/EACCES -> install guidance) from a
+  // CLI that ran but did not pass (generic verification-failed hint), so the
+  // message does not claim the CLI is missing when it is not.
+  const spawnFailed = result.spawnErrorCode != null
   const failed = result.code !== 0 || normalized.error !== null || result.timedOut
+  let installHint: string | null = null
+  if (spawnFailed) {
+    installHint =
+      '未检测到可用的 transit-truth CLI：内核尚未发布到 PyPI，请通过配置项 command 指向本地检出的 transit-truth，确认其在 PATH 后重试。'
+      + ' / No usable transit-truth CLI was found: the kernel is not on PyPI yet; point the `command` setting at a local checkout of transit-truth, make sure it is on PATH, and retry.'
+  } else if (failed) {
+    installHint =
+      '本次核验未通过（CLI 已运行但模型不匹配、报告错误或超时）：请核对端点 Base URL、模型名与密钥后重试；若使用本地内核检出，确认其为最新版本。'
+      + ' / This verification did not pass (the CLI ran but the model did not match, the report errored, or it timed out): check the endpoint Base URL, model name, and API key, then retry; if using a local kernel checkout, make sure it is up to date.'
+  }
   return json(200, {
     report: normalized,
     verdict,
@@ -291,10 +311,7 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
     timedOut: result.timedOut,
     stdoutTruncated: result.stdoutTruncated,
     stderrTruncated: result.stderrTruncated,
-    installHint: failed
-      ? '未检测到可用的 transit-truth CLI 或本次核验失败：内核尚未发布到 PyPI，请通过配置项 command 指向本地检出的 transit-truth，确认其在 PATH 后重试。'
-        + ' / No usable transit-truth CLI was found, or this verification failed: the kernel is not on PyPI yet; point the `command` setting at a local checkout of transit-truth, make sure it is on PATH, and retry.'
-      : null,
+    installHint,
   })
 }
 

@@ -82,7 +82,6 @@ describe('parseVerifyRequestBody: field whitelist + types', () => {
       baseUrl: '  https://relay.example/v1  ',
       model: '  gpt-4o-mini  ',
       apiKey: 'sk-x',
-      apiKeyEnv: '  GATEWAY_API_KEY  ',
       allowLocal: true,
       confirmCustomCommand: true,
     }))
@@ -91,9 +90,25 @@ describe('parseVerifyRequestBody: field whitelist + types', () => {
       expect(result.body.baseUrl).toBe('https://relay.example/v1')
       expect(result.body.model).toBe('gpt-4o-mini')
       expect(result.body.apiKey).toBe('sk-x')
-      expect(result.body.apiKeyEnv).toBe('GATEWAY_API_KEY')
       expect(result.body.allowLocal).toBe(true)
       expect(result.body.confirmCustomCommand).toBe(true)
+    }
+  })
+
+  it('trims a named apiKeyEnv', () => {
+    const result = parseVerifyRequestBody(JSON.stringify({ ...VALID, apiKeyEnv: '  GATEWAY_API_KEY  ' }))
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.body.apiKeyEnv).toBe('GATEWAY_API_KEY')
+  })
+
+  it('rejects both apiKey and apiKeyEnv with 400 conflicting_key_fields', () => {
+    const result = parseVerifyRequestBody(
+      JSON.stringify({ ...VALID, apiKey: 'sk-x', apiKeyEnv: 'GATEWAY_API_KEY' }),
+    )
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.status).toBe(400)
+      expect(result.error).toBe('conflicting_key_fields')
     }
   })
 
