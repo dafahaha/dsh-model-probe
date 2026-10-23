@@ -1,5 +1,16 @@
 # Changelog — dsh-model-probe
 
+## v0.1.6 — Round-9 independent clean review (fresh reviewer, cold reading)
+- P2-1 (fixed): the SSRF guard now catches deprecated IPv4-compatible IPv6
+  (`::127.0.0.1`, `::7f00:1`, `::0a01:0101`) as well as mapped forms, an
+  empty hostname, and multiple trailing dots (`localhost..`).
+- P2-2 (fixed): a stdout/stderr capture that hit the byte cap is now reported
+  (`stdoutTruncated/stderrTruncated`, error code `output_truncated`) rather
+  than being silently cut.
+- P2-3 (fixed): redaction now covers GitHub (ghp_/gho_/...), AWS (AKIA), and
+  a generic high-entropy mixed-case/digit string, in addition to sk-/Bearer.
+- Suite: 106 vitest (3 added); verify 0 FAIL/WARN/INFO; pack 9 files.
+
 ## v0.1.5 — Round-8 independent clean review (fresh reviewer, cold reading)
 - P2-2 (fixed): a `baseUrl` starting with "-" is now rejected, matching the
   `model` rule (CLI flag injection consistency).

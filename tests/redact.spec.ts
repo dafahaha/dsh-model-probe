@@ -23,6 +23,17 @@ describe('redactText', () => {
     expect(out).toContain('<redacted>:<redacted>@')
   })
 
+  it('redacts GitHub and AWS style tokens', () => {
+    expect(redactText('token ghp_abcdefgh1234567890 here')).not.toContain('abcdefgh1234567890')
+    expect(redactText('id AKIAIOSFODNN7EXAMPLE')).toContain('<redacted>')
+  })
+
+  it('redacts a generic high-entropy mixed-case/digit secret', () => {
+    const out = redactText('key AbCdEfGhIjKlMnOpQrSt1234567890 end')
+    expect(out).not.toContain('AbCdEfGhIjKlMnOpQrSt1234567890')
+    expect(out).toContain('<redacted>')
+  })
+
   it('leaves clean text untouched and handles empty input', () => {
     expect(redactText('hello world')).toBe('hello world')
     expect(redactText(undefined)).toBe('')

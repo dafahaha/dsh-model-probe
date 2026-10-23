@@ -90,6 +90,14 @@ describe('isNonPublicHost (plugin-layer SSRF guard)', () => {
     expect(isNonPublicHost('LocalHost.')).toBe(true)
     expect(isNonPublicHost('api.localhost')).toBe(true)
   })
+
+  it('flags deprecated IPv4-compatible IPv6, empty host, and multiple dots', () => {
+    expect(isNonPublicHost('::127.0.0.1')).toBe(true)
+    expect(isNonPublicHost('::7f00:1')).toBe(true)
+    expect(isNonPublicHost('::0a01:0101')).toBe(true)
+    expect(isNonPublicHost('')).toBe(true)
+    expect(isNonPublicHost('localhost..')).toBe(true)
+  })
 })
 
 describe('POST /api/model-probe/verify input gates', () => {

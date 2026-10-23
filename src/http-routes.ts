@@ -70,18 +70,22 @@ const LOCALHOST_NAMES = new Set(['localhost', 'ip6-localhost', 'ip6-loopback'])
  */
 export function isNonPublicHost(hostname: string): boolean {
   let h = hostname.toLowerCase().replace(/^\[|\]$/g, '')
-  // Normalize a trailing dot ("localhost.") and a ".localhost" suffix, both of
-  // which resolvers typically treat as the loopback host.
-  h = h.replace(/\.$/, '')
+  // An empty authority ("http:///path") is not a public host; block it.
+  if (h === '') return true
+  // Normalize ALL trailing dots ("localhost..") and a ".localhost" suffix.
+  h = h.replace(/\.+$/, '')
   if (LOCALHOST_NAMES.has(h) || h.endsWith('.localhost')) return true
 
-  // IPv4-mapped IPv6, dotted form (::ffff:192.168.1.1) -> inspect embedded v4.
-  const mappedDotted = h.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
-  if (mappedDotted) return isPrivateIPv4(mappedDotted[1])
-  // IPv4-mapped IPv6, hex form (::ffff:7f00:1) -> decode the two hextets.
-  const mappedHex = h.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
-  if (mappedHex) {
-    const hi = parseInt(mappedHex[1], 16), lo = parseInt(mappedHex[2], 16)
+  // Embedded-IPv4 transition forms, dotted. Both the mapped form
+  // (::ffff:192.168.1.1) and the deprecated compatible form
+  // (::192.168.1.1) -> inspect the embedded v4.
+  const v4Dotted = h.match(/^::(?:ffff:)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
+  if (v4Dotted) return isPrivateIPv4(v4Dotted[1])
+  // Embedded-IPv4 transition forms, two-hextet hex (::ffff:7f00:1 and the
+  // compatible ::7f00:1) -> decode the two hextets.
+  const v4Hex = h.match(/^::(?:ffff:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+  if (v4Hex) {
+    const hi = parseInt(v4Hex[1], 16), lo = parseInt(v4Hex[2], 16)
     return isPrivateIPv4(`${(hi >> 8) & 255}.${hi & 255}.${(lo >> 8) & 255}.${lo & 255}`)
   }
 
@@ -244,9 +248,17 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
   const resolved = resolveFinalVerdict(result.code, normalized)
   // A spawn failure (ENOENT/EACCES) has no CLI report; surface its code so the
   // operator can tell "command missing" from "the CLI ran but found nothing".
-  const effectiveErrorCode = result.spawnErrorCode
+  // A truncated capture that lost the report is surfaced separately.
+  let effectiveErrorCode: string | null = result.spawnErrorCode
     ? `spawn_${result.spawnErrorCode.toLowerCase()}`
     : resolved.errorCode
+  if (
+    !effectiveErrorCode
+    && (result.stdoutTruncated || result.stderrTruncated)
+    && normalized.error !== null
+  ) {
+    effectiveErrorCode = 'output_truncated'
+  }
   const verdict = resolved.verdict
 
   await appendEntry(historyFile(deps), {

@@ -12,6 +12,15 @@
 /** `sk-xxxx…yz` style OpenAI-style keys. */
 const SK_KEY = /\b(sk-[A-Za-z0-9_\-]{6,})\b/g
 
+/** GitHub-style tokens (ghp_/gho_/ghu_/ghs_/ghr_/github_pat_). */
+const GH_TOKEN = /\b(gh[po usr]_[A-Za-z0-9_]{8,}|github_pat_[A-Za-z0-9_]{12,})\b/g
+
+/** AWS access-key ids (AKIA…). */
+const AWS_KEY = /\b(AKIA[0-9A-Z]{12,})\b/g
+
+/** Generic high-entropy secret: a run of >=24 chars mixing lower, upper, digit. */
+const HIGH_ENTROPY = /\b(?=[A-Za-z0-9_\-]{24,})(?=[A-Za-z0-9_\-]*[a-z])(?=[A-Za-z0-9_\-]*[A-Z])(?=[A-Za-z0-9_\-]*\d)[A-Za-z0-9_\-]{24,}/g
+
 /** `Authorization: Bearer <token>` headers. */
 const BEARER = /(Bearer\s+)[A-Za-z0-9._\-]+/gi
 
@@ -43,6 +52,9 @@ export function redactText(text: string | undefined | null): string {
   if (text === undefined || text === null) return ''
   return String(text)
     .replace(SK_KEY, maskSkKey)
+    .replace(GH_TOKEN, '<redacted>')
+    .replace(AWS_KEY, '<redacted>')
+    .replace(HIGH_ENTROPY, '<redacted>')
     .replace(BEARER, '$1<redacted>')
     .replace(ASSIGNMENT, '$1<redacted>')
     .replace(URL_CREDENTIALS, '$1<redacted>:<redacted>@')

@@ -21,6 +21,10 @@ export interface RunResult {
   timedOut: boolean
   /** Node error code from a spawn failure (e.g. ENOENT/EACCES); null otherwise. */
   spawnErrorCode: string | null
+  /** True when stdout was capped at the byte ceiling (evidence may be cut). */
+  stdoutTruncated: boolean
+  /** True when stderr exceeded the 16KB tail buffer. */
+  stderrTruncated: boolean
 }
 
 /** Spawn inputs shared by the runner. */
@@ -54,6 +58,7 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
     let stdout = ''
     let stderr = ''
     let capped = false
+    let stderrTruncated = false
     let settled = false
     let spawnErrorCode: string | null = null
 
@@ -63,7 +68,10 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
       clearTimeout(timer)
       // Redact both streams before they leave the runner: a key-shaped string
       // the CLI ever printed into stdout must not reach the parser/response.
-      resolve({ code, stdout: redactText(stdout), stderr: redactText(stderr), timedOut, spawnErrorCode })
+      resolve({
+        code, stdout: redactText(stdout), stderr: redactText(stderr),
+        timedOut, spawnErrorCode, stdoutTruncated: capped, stderrTruncated,
+      })
     }
 
     const timer = setTimeout(() => {
@@ -75,14 +83,21 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
       if (capped) return
       const next = stdout + chunk.toString('utf8')
       if (Buffer.byteLength(next, 'utf8') > MAX_STDOUT_BYTES) {
+        // Mark (rather than silently drop) so a missing report can be told
+        // apart from "output exceeded the byte cap".
         capped = true
         return
       }
       stdout = next
     })
     child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8')
-      if (stderr.length > 16 * 1024) stderr = stderr.slice(-16 * 1024)
+      const next = stderr + chunk.toString('utf8')
+      if (next.length > 16 * 1024) {
+        stderrTruncated = true
+        stderr = next.slice(-16 * 1024)
+        return
+      }
+      stderr = next
     })
 
     child.on('error', (error: NodeJS.ErrnoException) => {
