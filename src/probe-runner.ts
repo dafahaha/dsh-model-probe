@@ -9,6 +9,62 @@
 import { spawn } from 'node:child_process'
 import { redactText } from './redact.ts'
 
+/** A byte ceiling on captured stdout so a runaway process cannot fill memory. */
+export const MAX_STDOUT_BYTES = 256 * 1024
+
+/** A character ceiling on captured stderr (only the tail is retained). */
+export const MAX_STDERR_CHARS = 16 * 1024
+
+/**
+ * A capped text accumulator. It appends until the byte ceiling fires, then
+ * latches `truncated` and ignores further input (the caller destroys the read
+ * side so the child is not blocked). Extracted as a pure helper so the cap
+ * behavior is unit-testable without spawning a large-output child.
+ */
+export class OutputCapture {
+  /** Accumulated text (up to the ceiling). */
+  value = ''
+  /** Latched once the ceiling fired; evidence beyond it was dropped. */
+  truncated = false
+
+  /**
+   * Append one decoded chunk.
+   * @param chunk - decoded text from the child stream.
+   * @param maxBytes - byte ceiling (UTF-8).
+   * @returns true when the cap fired on this append.
+   */
+  append(chunk: string, maxBytes: number): boolean {
+    if (this.truncated) return true
+    const next = this.value + chunk
+    if (Buffer.byteLength(next, 'utf8') > maxBytes) {
+      this.truncated = true
+      return true
+    }
+    this.value = next
+    return false
+  }
+}
+
+/**
+ * A tail-only stderr accumulator: once the character ceiling fires it keeps
+ * only the trailing window (the newest diagnostics) and latches `truncated`.
+ */
+export class TailCapture {
+  value = ''
+  truncated = false
+
+  append(chunk: string, maxChars: number): boolean {
+    const next = this.value + chunk
+    if (next.length > maxChars) {
+      this.truncated = true
+      this.value = next.slice(-maxChars)
+      return true
+    }
+    this.value = next
+    return false
+  }
+}
+
 /** Captured run result. */
 export interface RunResult {
   /** Exit code; null when killed by a signal. */
@@ -36,12 +92,9 @@ export interface RunInputs {
   timeoutMs: number
 }
 
-/** A byte ceiling on captured stdout so a runaway process cannot fill memory. */
-const MAX_STDOUT_BYTES = 256 * 1024
-
 /**
  * Run the CLI and resolve with the captured result. A timeout kills the child
- * (SIGKILL on Windows) and resolves `timedOut` rather than rejecting.
+ * (SIGKILL) and resolves `timedOut` rather than rejecting.
  * @param inputs - command, argv, env, and cap.
  * @returns captured result.
  */
@@ -55,10 +108,8 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
       shell: false,
     })
 
-    let stdout = ''
-    let stderr = ''
-    let capped = false
-    let stderrTruncated = false
+    const stdoutCap = new OutputCapture()
+    const stderrCap = new TailCapture()
     let settled = false
     let spawnErrorCode: string | null = null
 
@@ -69,8 +120,10 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
       // Redact both streams before they leave the runner: a key-shaped string
       // the CLI ever printed into stdout must not reach the parser/response.
       resolve({
-        code, stdout: redactText(stdout), stderr: redactText(stderr),
-        timedOut, spawnErrorCode, stdoutTruncated: capped, stderrTruncated,
+        code, stdout: redactText(stdoutCap.value), stderr: redactText(stderrCap.value),
+        timedOut, spawnErrorCode,
+        stdoutTruncated: stdoutCap.truncated,
+        stderrTruncated: stderrCap.truncated,
       })
     }
 
@@ -80,24 +133,15 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
     }, inputs.timeoutMs)
 
     child.stdout?.on('data', (chunk: Buffer) => {
-      if (capped) return
-      const next = stdout + chunk.toString('utf8')
-      if (Buffer.byteLength(next, 'utf8') > MAX_STDOUT_BYTES) {
-        // Mark (rather than silently drop) so a missing report can be told
-        // apart from "output exceeded the byte cap".
-        capped = true
-        return
+      if (stdoutCap.append(chunk.toString('utf8'), MAX_STDOUT_BYTES)) {
+        // The cap fired (or was already latched). Destroy the read side so the
+        // child's pending write fails fast (EPIPE) and the child exits; a
+        // truncated run is fail-closed, never PASS.
+        child.stdout?.destroy()
       }
-      stdout = next
     })
     child.stderr?.on('data', (chunk: Buffer) => {
-      const next = stderr + chunk.toString('utf8')
-      if (next.length > 16 * 1024) {
-        stderrTruncated = true
-        stderr = next.slice(-16 * 1024)
-        return
-      }
-      stderr = next
+      stderrCap.append(chunk.toString('utf8'), MAX_STDERR_CHARS)
     })
 
     child.on('error', (error: NodeJS.ErrnoException) => {

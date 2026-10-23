@@ -58,6 +58,12 @@ describe('isNonPublicHost (plugin-layer SSRF guard)', () => {
     for (const h of publicHosts) expect(isNonPublicHost(h)).toBe(false)
   })
 
+  it('does not mistake a DNS name beginning like an IPv6 hextet for a non-public host', () => {
+    for (const h of ['fc00.example.com', 'fd01.foo.com', 'fe80.bar.com', 'febf.qux.net']) {
+      expect(isNonPublicHost(h)).toBe(false)
+    }
+  })
+
   it('flags IPv6 loopback, unique-local, and link-local', () => {
     for (const h of ['::1', '::', 'fc00::1', 'fd00::1', 'fe80::1', '0:0:0:0:0:0:0:1']) {
       expect(isNonPublicHost(h)).toBe(true)

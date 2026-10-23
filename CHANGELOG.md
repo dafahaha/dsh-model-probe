@@ -1,5 +1,13 @@
 # Changelog — dsh-model-probe
 
+## v0.1.7 — Round-10 independent clean review (fresh reviewer, cold reading)
+- P2-1 (fixed): extracted OutputCapture/TailCapture (deterministic byte/tail
+  caps); stdout/stderr truncation flags are returned in the response and
+  history; output_truncated fires on any cap, not only on a parse error.
+- P2-2 (fixed): firstHextet uses ':' only and the ULA/link-local range check
+  requires IPv6, so DNS names (fc00.example.com) are not false-blocked.
+- Suite: 114 vitest (12 files).
+
 ## v0.1.6 — Round-9 independent clean review (fresh reviewer, cold reading)
 - P2-1 (fixed): the SSRF guard now catches deprecated IPv4-compatible IPv6
   (`::127.0.0.1`, `::7f00:1`, `::0a01:0101`) as well as mapped forms, an

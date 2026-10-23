@@ -60,6 +60,7 @@ export interface HistoryEntry {
   behavioralSamples: number
   requestsUsed: number
   errorCode: string | null
+  outputTruncated: boolean
 }
 
 /** A best-effort prefilled endpoint read from the profile patch (host only). */

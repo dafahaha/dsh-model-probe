@@ -92,11 +92,14 @@ export function isNonPublicHost(hostname: string): boolean {
   // Unspecified / loopback (compact and fully-expanded forms).
   if (h === '::' || h === '::1' || /^(0:){7}1$/.test(h)) return true
 
-  // Range checks keyed on the first hextet.
-  const first = firstHextet(h)
-  if (first !== null) {
-    if (first >= 0xfc00 && first <= 0xfdff) return true // unique-local fc00::/7
-    if (first >= 0xfe80 && first <= 0xfebf) return true // link-local fe80::/10
+  // Range checks keyed on the first hextet. Only for IPv6 literals (a DNS name
+  // such as "fc00.example.com" must not be read as a unique-local address).
+  if (h.includes(':')) {
+    const first = firstHextet(h)
+    if (first !== null) {
+      if (first >= 0xfc00 && first <= 0xfdff) return true // unique-local fc00::/7
+      if (first >= 0xfe80 && first <= 0xfebf) return true // link-local fe80::/10
+    }
   }
 
   // Direct dotted IPv4.
@@ -104,10 +107,11 @@ export function isNonPublicHost(hostname: string): boolean {
   return false
 }
 
-/** The numeric value of the first IPv6 hextet (0 for a leading `::`). */
+/** The numeric value of the first IPv6 hextet (0 for a leading `::`). The
+ * delimiter is a colon only, so a dot-ended DNS prefix is not mistaken for it. */
 function firstHextet(h: string): number | null {
   if (h.startsWith('::')) return 0
-  const m = h.match(/^([0-9a-f]{1,4})[:.]/)
+  const m = h.match(/^([0-9a-f]{1,4}):/)
   return m ? parseInt(m[1], 16) : null
 }
 
@@ -252,11 +256,10 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
   let effectiveErrorCode: string | null = result.spawnErrorCode
     ? `spawn_${result.spawnErrorCode.toLowerCase()}`
     : resolved.errorCode
-  if (
-    !effectiveErrorCode
-    && (result.stdoutTruncated || result.stderrTruncated)
-    && normalized.error !== null
-  ) {
+  // A capture that hit the byte cap is observable even when the report was
+  // still parsed, so a caller cannot mistake a cut-off run for a complete one.
+  const outputTruncated = result.stdoutTruncated || result.stderrTruncated
+  if (!effectiveErrorCode && outputTruncated) {
     effectiveErrorCode = 'output_truncated'
   }
   const verdict = resolved.verdict
@@ -273,6 +276,7 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
     behavioralSamples: normalized.summary.behavioralSamples,
     requestsUsed: normalized.summary.requestsUsed,
     errorCode: effectiveErrorCode,
+    outputTruncated,
   })
 
   // A non-zero exit or an unusable report surfaces install guidance so the
@@ -283,6 +287,8 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
     verdict,
     errorCode: effectiveErrorCode,
     timedOut: result.timedOut,
+    stdoutTruncated: result.stdoutTruncated,
+    stderrTruncated: result.stderrTruncated,
     installHint: failed
       ? '未检测到可用的 transit-truth CLI 或本次核验失败：内核尚未发布到 PyPI，请通过配置项 command 指向本地检出的 transit-truth，确认其在 PATH 后重试。'
         + ' / No usable transit-truth CLI was found, or this verification failed: the kernel is not on PyPI yet; point the `command` setting at a local checkout of transit-truth, make sure it is on PATH, and retry.'
