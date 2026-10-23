@@ -46,6 +46,9 @@ const ALLOWED_FIELDS = [
   'confirmCustomCommand',
 ] as const
 
+/** A valid environment variable name (passed as a CLI option value). */
+const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
+
 /** Build a rejection without throwing. */
 function reject(status: 400 | 413, error: string, message: string): VerifyBodyRejection {
   return { ok: false, status, error, message }
@@ -86,11 +89,21 @@ export function parseVerifyRequestBody(rawText: string): VerifyBodyResult {
   if (typeof record.model !== 'string' || record.model.trim().length === 0) {
     return reject(400, 'missing_field', 'model is required and must be a non-empty string')
   }
+  if (record.model.trim().startsWith('-')) {
+    // A model id is passed as a CLI option value; a leading '-' would be parsed
+    // as another flag rather than consumed as the value.
+    return reject(400, 'invalid_value', 'model must not start with "-"')
+  }
   if (record.apiKey !== undefined && typeof record.apiKey !== 'string') {
     return reject(400, 'invalid_type', 'apiKey must be a string')
   }
   if (record.apiKeyEnv !== undefined && typeof record.apiKeyEnv !== 'string') {
     return reject(400, 'invalid_type', 'apiKeyEnv must be a string')
+  }
+  if (typeof record.apiKeyEnv === 'string' && !ENV_NAME_RE.test(record.apiKeyEnv.trim())) {
+    // The env name is passed as a CLI option value and used to read a variable;
+    // restrict it to a normal identifier (no spaces, '=', or leading '-').
+    return reject(400, 'invalid_value', 'apiKeyEnv must be a valid environment variable name')
   }
   if (record.allowLocal !== undefined && typeof record.allowLocal !== 'boolean') {
     return reject(400, 'invalid_type', 'allowLocal must be a boolean')

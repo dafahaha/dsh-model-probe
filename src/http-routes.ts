@@ -55,6 +55,39 @@ function json(status: number, body: unknown): Response {
   })
 }
 
+/**
+ * Whether *hostname* is a non-public (loopback / private / link-local) literal
+ * address. This is a defense-in-depth second check behind the CLI: it only
+ * catches literal IPs, not hostnames that resolve to a private address.
+ * @param hostname - the URL's hostname (brackets already stripped for IPv6).
+ * @returns true when the address is loopback, private, or link-local.
+ */
+export function isNonPublicHost(hostname: string): boolean {
+  const h = hostname.toLowerCase()
+  // IPv4-mapped IPv6 (e.g. ::ffff:192.168.1.1) -> inspect the embedded v4.
+  const mapped = h.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
+  if (mapped) return isPrivateIPv4(mapped[1])
+  if (h === '::1' || h === '::') return true
+  if (h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return true
+  // Bare IPv6 loopback expansion 0:0:0:0:0:0:0:1.
+  if (/^(0:){7}1$/.test(h)) return true
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return isPrivateIPv4(h)
+  return false
+}
+
+/** Whether a dotted-quad IPv4 address is loopback, private, or link-local. */
+function isPrivateIPv4(ip: string): boolean {
+  const o = ip.split('.').map((x) => Number(x))
+  if (o.some((n) => n < 0 || n > 255)) return false
+  const [a, b] = o
+  if (a === 0 || a === 10 || a === 127) return true
+  if (a === 100 && b >= 64 && b <= 127) return true // CGNAT 100.64.0.0/10
+  if (a === 169 && b === 254) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 192 && b === 168) return true
+  return false
+}
+
 /** Resolve the history file path, falling back to `~/.dsh/model-probe/`. */
 function historyFile(deps: RouteDeps): string {
   if (typeof deps.homePath === 'function') {
@@ -101,6 +134,17 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
     return json(400, { error: 'invalid_url', message: 'baseUrl must be http(s)' })
   }
 
+  const allowLocal = body.allowLocal || deps.config.allowLocal
+
+  // Defense-in-depth behind the CLI: unless local probing is explicitly allowed,
+  // reject a literal loopback/private/link-local address at the plugin layer.
+  if (!allowLocal && isNonPublicHost(parsedUrl.hostname)) {
+    return json(400, {
+      error: 'local_address_blocked',
+      message: 'loopback/private/link-local addresses are blocked unless allowLocal is set',
+    })
+  }
+
   // §3.6.2: a custom executable path is a code-execution surface; require an
   // explicit one-time confirmation before the first spawn (remembered in-process).
   const command = resolveCommand(deps.config.command)
@@ -111,8 +155,6 @@ async function handleVerify(deps: RouteDeps, body: VerifiedVerifyBody): Promise<
       message: '自定义可执行路径=代码执行面：请在确认其可信后勾选确认再运行。',
     })
   }
-
-  const allowLocal = body.allowLocal || deps.config.allowLocal
 
   const routing = resolveKeyRouting(body.apiKey, body.apiKeyEnv)
   const args = withApiKeyEnv(

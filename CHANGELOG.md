@@ -1,5 +1,18 @@
 # Changelog — dsh-model-probe
 
+## v0.1.2 — Round-5 independent technical review (fresh reviewer, cold reading)
+- P2-1 (fixed): a `model`/`apiKeyEnv` value passed as a CLI option was not
+  guarded against a leading `-`; model ids starting with `-` are rejected and
+  apiKeyEnv must match a normal identifier (`[A-Za-z_][A-Za-z0-9_]*`).
+- P2-2 (fixed): added a plugin-layer SSRF guard — literal loopback, private,
+  and link-local addresses are blocked unless `allowLocal` is set (the CLI
+  remains the primary check; this is defense-in-depth).
+- P2-3 (fixed): the runner now redacts stdout as well as stderr, so a
+  key-shaped string the CLI ever printed cannot reach the parser/response.
+- New tests: model/env-name validation, non-public host detection (IPv4/IPv6/
+  mapped), stdout redaction. Suite: 88 -> 95 across 11 files. verify still
+  0 FAIL/WARN/INFO; pack still 9 files.
+
 Pre-release, reused from the earlier local draft (58 vitest tests green at v1).
 
 ## v1 (baseline, carried over)

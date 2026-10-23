@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-probe",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "DSH plugin: one-click TransitTruth model-identity probe on the currently configured endpoint, with a three-state badge (pass / suspicious / insufficient_evidence) and an append-only local history. Thin shell over the local transit-truth CLI; it never stores or logs the API key. Pre-release: kernel not yet on PyPI; this package is NOT published to npm.",
   "license": "MIT",
   "author": "Daizhi Liao (dafahaha)",

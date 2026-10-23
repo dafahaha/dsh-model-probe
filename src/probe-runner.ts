@@ -56,7 +56,9 @@ export function runVerify(inputs: RunInputs): Promise<RunResult> {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      resolve({ code, stdout, stderr: redactText(stderr), timedOut })
+      // Redact both streams before they leave the runner: a key-shaped string
+      // the CLI ever printed into stdout must not reach the parser/response.
+      resolve({ code, stdout: redactText(stdout), stderr: redactText(stderr), timedOut })
     }
 
     const timer = setTimeout(() => {

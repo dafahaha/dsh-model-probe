@@ -61,6 +61,19 @@ describe('stub bridge: error fails closed', () => {
   })
 })
 
+describe('stub bridge: stdout redaction', () => {
+  it('redacts a key-shaped string the CLI printed into stdout', async () => {
+    const result = await runVerify({
+      command: process.execPath,
+      args: ['-e', "console.log('leaked sk-abcdefgh123456 end')"],
+      env: {},
+      timeoutMs: 5000,
+    })
+    expect(result.stdout).not.toMatch(/sk-abcdefgh123456/)
+    expect(result.stdout).toMatch(/sk-/)
+  })
+})
+
 describe('stub bridge: history append-only', () => {
   it('appends a row and reads it back without a key or full URL', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'stub-hist-'))
