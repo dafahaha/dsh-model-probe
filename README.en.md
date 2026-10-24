@@ -25,11 +25,13 @@ This plugin is a **thin bridge**: it implements no verification logic of its own
 
 ## Honest disclosure (release status)
 
-- **The npm name `dsh-model-probe` is squatted by an unrelated third party.**
-  It is owned by npm maintainer weiwie (GitHub xiaomao49/dsh-model-probe), still
-  actively publishing as of 2026-10-25 (latest=0.1.20, 19 releases in total),
-  and it is itself a DSH endpoint model probe — a competing implementation,
-  **not a deprecated package**. We publish under the new name
+- **The npm name `dsh-model-probe` is occupied by an unrelated third party.**
+  It is owned by npm maintainer weiwie (GitHub xiaomao49/dsh-model-probe) and
+  was a DSH endpoint model probe with the same function; **all 19 of its
+  versions (including latest 0.1.20) were marked deprecated/unmaintained by
+  the maintainer on 2026-10-09** (verified directly against the official npm
+  registry: "Deprecated and unmaintained (2026-10-09)."). The name remains
+  occupied, so we cannot publish under it; we publish as
   `dsh-transit-truth-probe` (keeping the `dsh-` prefix for `dsh-plugin`
   ecosystem discovery and the `transit-truth` brand); do NOT install the npm
   package `dsh-model-probe`.
@@ -75,7 +77,7 @@ npm install: `dsh plugin add dsh-transit-truth-probe` (or `npm install -g dsh-tr
 > plugin: the plugin HTTP response is always 200; trust the JSON `verdict`
 > field rather than the HTTP status.
 
-Exit codes (kernel CLI): `0` = pass or insufficient_evidence (distinguish via the JSON `verdict` field), `3` = suspicious, `2` = execution error.
+Exit codes (kernel CLI): `0` = pass; `2` = execution error or insufficient_evidence; `3` = suspicious.
 
 ## Privacy & security
 
@@ -104,7 +106,7 @@ Pure-logic unit tests cover: verify JSON parsing, three-state mapping, append-on
 
 ## Release status (npm package: dsh-transit-truth-probe)
 
-1. **npm package: `dsh-transit-truth-probe`.** The old name `dsh-model-probe` is squatted by npm maintainer weiwie (GitHub xiaomao49/dsh-model-probe), still actively publishing as of 2026-10-25 (latest=0.1.20, 19 releases in total) — a competing DSH endpoint probe, **not a deprecated package**; do not confuse the two.
+1. **npm package: `dsh-transit-truth-probe`.** The old name `dsh-model-probe` is occupied by npm maintainer weiwie (GitHub xiaomao49/dsh-model-probe), formerly a DSH endpoint probe with the same function; all 19 of its versions were marked deprecated/unmaintained on 2026-10-09 (verified directly against the official npm registry). The name remains occupied; do not confuse the two.
 2. The `transit-truth` kernel is not on PyPI; this plugin is a companion installed locally alongside the kernel source, not distributed standalone.
 3. Real dsh-tui 0.16.x host live testing is pending; no directory-indexing claim is made before then.
 4. Local gates pass: `npm run typecheck`, `npm run test`, `npm run build`, `npm run verify` (official verify-plugin static gate, 0 FAIL), and `npm run pack` (dry-run).

@@ -23,7 +23,7 @@
 
 ## 诚实披露（发布状态）
 
-- **npm 名 `dsh-model-probe` 已被无关第三方占用**：该名称由 npm 维护者 weiwie（GitHub xiaomao49/dsh-model-probe）注册，截至 2026-10-25 仍在活跃发布（latest=0.1.20，共 19 个版本），且功能同样是 DSH 端点模型探针——是竞品实现，**不是弃用/deprecated 包**。本项目以新名 `dsh-transit-truth-probe` 发布（保留 `dsh-` 前缀以进入 `dsh-plugin` 生态发现，并内嵌 `transit-truth` 品牌）；请勿安装 npm 上的 `dsh-model-probe`。
+- **npm 名 `dsh-model-probe` 被无关第三方占用**：该名称由 npm 维护者 weiwie（GitHub xiaomao49/dsh-model-probe）注册，曾是功能相同的 DSH 端点探针；**其全部 19 个版本（含 latest 0.1.20）已于 2026-10-09 被维护者标记 deprecated/unmaintained**（直连官方 registry 实测："Deprecated and unmaintained (2026-10-09). 本包已废弃并停止维护。"）。名字仍被占用、无法在该名下发布，故本项目以新名 `dsh-transit-truth-probe` 发布（保留 `dsh-` 前缀以进入 `dsh-plugin` 生态发现，并内嵌 `transit-truth` 品牌）；请勿安装 npm 上的 `dsh-model-probe`。
 - **内核未上 PyPI，本插件是配套 companion**：核验能力全部来自本地 `transit-truth` 内核 CLI；内核尚未发布到 PyPI，本插件不能独立提供核验能力，必须配合本地检出的内核源码使用。
 - **真实宿主 live 测试待做**：尚未在真实 dsh-tui 0.16.x 宿主界面做过端到端 live 测试；Host/Origin/loopback 强制由宿主通道负责，本插件不自行实现。
 
@@ -65,7 +65,7 @@ dsh plugin --profile web add .
 > 以下为 transit-truth **内核 CLI** 的退出码；插件 HTTP 响应恒为 200，结果以 JSON 的
 > `verdict` 字段为准，不要按 HTTP 状态码判断。
 
-退出码（内核 CLI）：`0` = pass 或 insufficient_evidence（以 JSON 的 `verdict` 字段区分），`3` = suspicious，`2` = 执行错误。
+退出码（内核 CLI）：`0` = pass；`2` = 执行错误或证据不足（insufficient_evidence）；`3` = suspicious。
 
 ## 隐私与安全
 
@@ -94,7 +94,7 @@ npm run check                   # typecheck + test + build
 
 ## 发布状态（npm 包名：dsh-transit-truth-probe）
 
-1. **npm 名 `dsh-model-probe` 已被第三方抢注**：维护者 weiwie（GitHub xiaomao49/dsh-model-probe），截至 2026-10-25 仍在活跃发布（latest=0.1.20，共 19 个版本），功能同为 DSH 端点探针（竞品实现，非弃用包）。本项目以 `dsh-transit-truth-probe` 为新包名发布。
+1. **npm 名 `dsh-model-probe` 已被第三方抢注**：维护者 weiwie（GitHub xiaomao49/dsh-model-probe），曾是功能相同的 DSH 端点探针；其全部 19 个版本已于 2026-10-09 被维护者标记 deprecated/unmaintained（直连官方 registry 实测）。名字仍被占用，本项目以 `dsh-transit-truth-probe` 为新包名发布。
 2. 内核 `transit-truth` 尚未上 PyPI，本插件只是配套 companion，随内核本地源码一起安装使用，不独立分发。
 3. 真实 dsh-tui 0.16.x 宿主 live 测试待做；在此之前不做任何目录收录声明。
 4. 本地门禁已跑通：`npm run typecheck`、`npm run test`、`npm run build`、`npm run verify`（官方 verify-plugin 静态门禁，0 FAIL）、`npm run pack`（dry-run）。
