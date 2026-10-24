@@ -25,10 +25,14 @@ This plugin is a **thin bridge**: it implements no verification logic of its own
 
 ## Honest disclosure (release status)
 
-- **The npm name is taken; this project is NOT published to npm.** The npm
-  package name `dsh-model-probe` is already registered by someone else (a
-  different, deprecated package unrelated to this project); this repo never runs
-  `npm publish` and does not claim that name.
+- **The npm name `dsh-model-probe` is squatted by an unrelated third party.**
+  It is owned by npm maintainer weiwie (GitHub xiaomao49/dsh-model-probe), still
+  actively publishing as of 2026-10-25 (latest=0.1.20, 19 releases in total),
+  and it is itself a DSH endpoint model probe — a competing implementation,
+  **not a deprecated package**. We publish under the new name
+  `dsh-transit-truth-probe` (keeping the `dsh-` prefix for `dsh-plugin`
+  ecosystem discovery and the `transit-truth` brand); do NOT install the npm
+  package `dsh-model-probe`.
 - **The kernel is not on PyPI; this plugin is a companion.** All verification
   comes from the local `transit-truth` kernel CLI. The kernel is not published
   to PyPI, so this plugin cannot provide verification on its own and must be
@@ -47,7 +51,7 @@ dsh plugin --profile web add .
 ```
 
 Use `dsh --profile web --dump-config` to confirm the plugin entered the final config.
-This package is not on npm; there is no `dsh plugin add dsh-model-probe` npm install path.
+npm install: `dsh plugin add dsh-transit-truth-probe` (or `npm install -g dsh-transit-truth-probe` and reference it in your config).
 
 ## Usage
 
@@ -89,7 +93,7 @@ Exit codes (kernel CLI): `0` = pass or insufficient_evidence (distinguish via th
 ## Development
 
 ```sh
-npm install --legacy-peer-deps   # local npm arborist crashes on peer resolution; bypass it
+npm install --legacy-peer-deps   # this machine's npm arborist mis-resolves peer deps (environment quirk, not a package bug); plain npm install works in a normal environment
 npm run typecheck
 npm run test                     # vitest
 npm run build                   # tsdown -> lib/index.js + lib/client.js
@@ -98,9 +102,9 @@ npm run check                   # typecheck + test + build
 
 Pure-logic unit tests cover: verify JSON parsing, three-state mapping, append-only history, key redaction, endpoint prefill parsing, and spawn argument building. The three stubs under `stubs/` (pass / suspicious / error) validate the bridge without Python, a key, or network.
 
-## Release stance (not published to npm)
+## Release status (npm package: dsh-transit-truth-probe)
 
-1. **No `npm publish`**: the npm name `dsh-model-probe` is taken by another, deprecated package; this project does not squat on it or publish to npm.
+1. **npm package: `dsh-transit-truth-probe`.** The old name `dsh-model-probe` is squatted by npm maintainer weiwie (GitHub xiaomao49/dsh-model-probe), still actively publishing as of 2026-10-25 (latest=0.1.20, 19 releases in total) — a competing DSH endpoint probe, **not a deprecated package**; do not confuse the two.
 2. The `transit-truth` kernel is not on PyPI; this plugin is a companion installed locally alongside the kernel source, not distributed standalone.
 3. Real dsh-tui 0.16.x host live testing is pending; no directory-indexing claim is made before then.
 4. Local gates pass: `npm run typecheck`, `npm run test`, `npm run build`, `npm run verify` (official verify-plugin static gate, 0 FAIL), and `npm run pack` (dry-run).

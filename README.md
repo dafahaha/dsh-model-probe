@@ -23,7 +23,7 @@
 
 ## 诚实披露（发布状态）
 
-- **npm 名称已被占用，本项目不发布到 npm**：npm 上的 `dsh-model-probe` 名称已由他人注册（是另一个已 deprecated 的包），与本项目无关；本仓库**不会**执行 `npm publish`，也不占用该名称。
+- **npm 名 `dsh-model-probe` 已被无关第三方占用**：该名称由 npm 维护者 weiwie（GitHub xiaomao49/dsh-model-probe）注册，截至 2026-10-25 仍在活跃发布（latest=0.1.20，共 19 个版本），且功能同样是 DSH 端点模型探针——是竞品实现，**不是弃用/deprecated 包**。本项目以新名 `dsh-transit-truth-probe` 发布（保留 `dsh-` 前缀以进入 `dsh-plugin` 生态发现，并内嵌 `transit-truth` 品牌）；请勿安装 npm 上的 `dsh-model-probe`。
 - **内核未上 PyPI，本插件是配套 companion**：核验能力全部来自本地 `transit-truth` 内核 CLI；内核尚未发布到 PyPI，本插件不能独立提供核验能力，必须配合本地检出的内核源码使用。
 - **真实宿主 live 测试待做**：尚未在真实 dsh-tui 0.16.x 宿主界面做过端到端 live 测试；Host/Origin/loopback 强制由宿主通道负责，本插件不自行实现。
 
@@ -35,14 +35,14 @@
 
 ## 安装
 
-仅支持本地从源码安装（配套本地内核检出）。在本仓库目录执行：
+从 npm 安装：`dsh plugin add dsh-transit-truth-probe`；或本地从源码安装（配套本地内核检出），在本仓库目录执行：
 
 ```sh
 dsh plugin --profile web add .
 # dsh web 运行中则重启并刷新页面
 ```
 
-可用 `dsh --profile web --dump-config` 确认插件已进入最终配置。本包不上 npm，也不提供 `dsh plugin add dsh-model-probe` 这种 npm 安装方式。
+可用 `dsh --profile web --dump-config` 确认插件已进入最终配置。npm 安装方式：`dsh plugin add dsh-transit-truth-probe`（或 `npm install -g dsh-transit-truth-probe` 后在配置中引用）。
 
 ## 使用
 
@@ -83,7 +83,7 @@ dsh plugin --profile web add .
 ## 开发
 
 ```sh
-npm install --legacy-peer-deps   # 本机 npm arborist 在 peer 解析上有 bug，需绕过
+npm install --legacy-peer-deps   # 本机 npm arborist 在此环境误解析 peer 依赖（本机环境问题，非包问题）；正常环境直接 npm install 即可
 npm run typecheck
 npm run test                     # vitest
 npm run build                   # tsdown -> lib/index.js + lib/client.js
@@ -92,9 +92,9 @@ npm run check                   # typecheck + test + build
 
 纯逻辑单测覆盖：verify JSON 解析、三态映射、append-only 历史、密钥脱敏、端点预填解析、spawn 参数构建。`stubs/` 下的三个桩（pass / suspicious / error）用于在无 Python、无密钥、无网络的条件下验证桥接层。
 
-## 发布立场（不发布到 npm）
+## 发布状态（npm 包名：dsh-transit-truth-probe）
 
-1. **不执行 `npm publish`**：npm 名称 `dsh-model-probe` 已被他人注册（另一个已 deprecated 的包），本项目不抢注、不发布到 npm。
+1. **npm 名 `dsh-model-probe` 已被第三方抢注**：维护者 weiwie（GitHub xiaomao49/dsh-model-probe），截至 2026-10-25 仍在活跃发布（latest=0.1.20，共 19 个版本），功能同为 DSH 端点探针（竞品实现，非弃用包）。本项目以 `dsh-transit-truth-probe` 为新包名发布。
 2. 内核 `transit-truth` 尚未上 PyPI，本插件只是配套 companion，随内核本地源码一起安装使用，不独立分发。
 3. 真实 dsh-tui 0.16.x 宿主 live 测试待做；在此之前不做任何目录收录声明。
 4. 本地门禁已跑通：`npm run typecheck`、`npm run test`、`npm run build`、`npm run verify`（官方 verify-plugin 静态门禁，0 FAIL）、`npm run pack`（dry-run）。
