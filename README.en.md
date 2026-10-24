@@ -45,7 +45,7 @@ This plugin is a **thin bridge**: it implements no verification logic of its own
 
 ## Install
 
-Local source install only (alongside a local kernel checkout). From this repository directory run:
+**Currently the only way: local source install** (alongside a local kernel checkout). From this repository directory run:
 
 ```sh
 dsh plugin --profile web add .
@@ -53,7 +53,8 @@ dsh plugin --profile web add .
 ```
 
 Use `dsh --profile web --dump-config` to confirm the plugin entered the final config.
-npm install: `dsh plugin add dsh-transit-truth-probe` (or `npm install -g dsh-transit-truth-probe` and reference it in your config).
+
+> npm install (future tense, not available yet): `dsh plugin add dsh-transit-truth-probe` becomes available only after the user approves the new name (recommended: `dsh-transit-truth-probe`) and runs the rename + `npm publish`; **the name is currently 404 on npm, so this command fails today.**
 
 ## Usage
 

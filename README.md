@@ -35,14 +35,16 @@
 
 ## 安装
 
-从 npm 安装：`dsh plugin add dsh-transit-truth-probe`；或本地从源码安装（配套本地内核检出），在本仓库目录执行：
+**当前唯一可用方式：本地从源码安装**（配套本地内核检出）。在本仓库目录执行：
 
 ```sh
 dsh plugin --profile web add .
 # dsh web 运行中则重启并刷新页面
 ```
 
-可用 `dsh --profile web --dump-config` 确认插件已进入最终配置。npm 安装方式：`dsh plugin add dsh-transit-truth-probe`（或 `npm install -g dsh-transit-truth-probe` 后在配置中引用）。
+可用 `dsh --profile web --dump-config` 确认插件已进入最终配置。
+
+> npm 安装（未来时，暂不可用）：待拍板新名（推荐 `dsh-transit-truth-probe`）并完成改名与 `npm publish` 后，才能 `dsh plugin add dsh-transit-truth-probe`；**当前该名在 npm 上是 404，此命令现在执行会失败**。
 
 ## 使用
 
