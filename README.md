@@ -67,7 +67,7 @@ dsh plugin --profile web add .
 > 以下为 transit-truth **内核 CLI** 的退出码；插件 HTTP 响应恒为 200，结果以 JSON 的
 > `verdict` 字段为准，不要按 HTTP 状态码判断。
 
-退出码（内核 CLI）：`0` = pass；`2` = 执行错误或证据不足（insufficient_evidence）；`3` = suspicious。
+退出码（内核 CLI）：`0` = pass；`1` = 其它命令的运行时错误（或裸跑不带子命令）；`2` = verify 非 pass（执行错误或证据不足 insufficient_evidence，含 argparse usage 错误）；`3` = suspicious。
 
 ## 隐私与安全
 
