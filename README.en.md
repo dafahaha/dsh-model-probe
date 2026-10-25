@@ -78,7 +78,7 @@ Use `dsh --profile web --dump-config` to confirm the plugin entered the final co
 > plugin: the plugin HTTP response is always 200; trust the JSON `verdict`
 > field rather than the HTTP status.
 
-Exit codes (kernel CLI): `0` = pass; `2` = execution error or insufficient_evidence; `3` = suspicious.
+Exit codes (kernel CLI): `0` = pass; `1` = runtime error of other commands (or bare run with no subcommand); `2` = verify non-pass (execution error or insufficient_evidence, including argparse usage errors); `3` = suspicious.
 
 ## Privacy & security
 

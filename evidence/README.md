@@ -4,7 +4,8 @@
 
 ## 文件
 
-- `test-run.log` — `vitest run --reporter=verbose` 全量输出（**历史快照，R2 时点**：8 个测试文件、57 个用例全部通过，含 `config.spec.ts` 7 例配置校验；该日志未随后续轮次重跑）。当前（2026-10-22 安全加固轮）为 10 个测试文件、84 个用例，真实输出见 `tests/test-output.txt`。
+- `test-run.log` — `vitest run --reporter=verbose` 全量输出（**历史快照，R2 时点**：8 个测试文件、57 个用例全部通过，含 `config.spec.ts` 7 例配置校验；该日志未随后续轮次重跑）。
+- **当前真实测试结果以 `tests/test-output.txt` 为准**（最近实跑：12 个测试文件、**119 个用例全部通过**）；历史计数演进见仓库根 `CHANGELOG.md`，不再在此手写数字以免漂移。
 
 ## 本轮（R2）修复清单
 
