@@ -50,8 +50,9 @@ transit-truth verify --base-url http://127.0.0.1:8765/v1 \
 未在本机启动 `npx @deepseek-ai/dsh web` 做真实控制台冒烟：本环境禁止遗留长驻 node/npx 进程，且不登录；本仓库未安装/启动宿主。可复现步骤（发布后）：
 
 ```sh
-# 1. 安装插件到 web profile
-dsh plugin --profile web add dsh-model-probe
+# 1. 安装插件到 web profile（用改名后的新名；dsh-model-probe 是被第三方
+#    抢注且已 deprecated 的包，切勿 add 旧名）
+dsh plugin --profile web add dsh-transit-truth-probe
 # 2. 启动控制台
 npx @deepseek-ai/dsh web 127.0.0.1:3080
 # 3. 设置 → 模型核验，填 Base URL/模型，点一键核验，核对徽章/证据/历史
